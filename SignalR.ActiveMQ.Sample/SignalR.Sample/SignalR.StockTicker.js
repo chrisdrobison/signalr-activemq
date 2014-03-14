@@ -25,7 +25,7 @@ jQuery.fn.flash = function (color, duration) {
 };
 
 $(function () {
-
+    $.connection.hub.logging = true;
     var ticker = $.connection.stockTicker, // the generated client-side hub proxy
         up = '▲',
         down = '▼',

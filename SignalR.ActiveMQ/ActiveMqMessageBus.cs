@@ -75,7 +75,7 @@ namespace SignalR.ActiveMQ
         {
             var scaleoutMessage = ActiveMqMessage.FromMessage(message);
             TraceMessages(scaleoutMessage.Messages, "Receiving");
-            OnReceived(topicIndex, scaleoutMessage.Messages.First().MappingId, scaleoutMessage);
+            OnReceived(topicIndex, 0, scaleoutMessage);
         }
 
         private void TraceMessages(IList<Message> messages, string messageType)

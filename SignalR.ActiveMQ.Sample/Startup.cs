@@ -1,6 +1,7 @@
-﻿using Microsoft.Owin;
+﻿using Microsoft.AspNet.SignalR;
+using Microsoft.Owin;
 using Owin;
-
+using SignalR.ActiveMQ;
 
 [assembly: OwinStartupAttribute(typeof(SignalR.ActiveMQ.Sample.Startup))]
 namespace SignalR.ActiveMQ.Sample
@@ -11,6 +12,7 @@ namespace SignalR.ActiveMQ.Sample
         {
             ConfigureAuth(app);
             app.MapSignalR();
+            GlobalHost.DependencyResolver.UseActiveMQ();
         }
     }
 }

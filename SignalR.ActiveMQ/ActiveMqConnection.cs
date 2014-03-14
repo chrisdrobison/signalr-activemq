@@ -101,6 +101,7 @@ namespace SignalR.ActiveMQ
                 {
                     _connection = _connectionFactory.CreateConnection();
                     _session = _connection.CreateSession();
+                    _connection.Start();
                 }
             }
         }
