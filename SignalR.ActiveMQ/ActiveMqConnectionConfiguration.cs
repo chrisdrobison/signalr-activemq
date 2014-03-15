@@ -1,44 +1,32 @@
 ﻿using System;
 using System.Configuration;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.AspNet.SignalR.Messaging;
 
 namespace SignalR.ActiveMQ
 {
-    class ActiveMqConnectionConfiguration : ScaleoutConfiguration
+    internal class ActiveMqConnectionConfiguration : ScaleoutConfiguration
     {
         private const string ConfigPrefix = "signalr-activemq:";
         private const string BrokerUrlKey = "brokerUrl";
-        private static string _brokerUrl = null;
+
+        private static string _brokerUrl;
 
         /// <summary>
-        /// 
         /// </summary>
         public string ConnectionString
         {
             get
             {
-                if (_brokerUrl == null)
+                const string key = ConfigPrefix + BrokerUrlKey;
+                if (_brokerUrl == null && (_brokerUrl = ConfigurationManager.AppSettings[key]) == null)
                 {
-                    var key = ConfigPrefix + BrokerUrlKey;
-                    AppSettingsReader settingsReader = new AppSettingsReader();
-                    _brokerUrl = settingsReader.GetValue(key, typeof(string)) as string;
-                    if (_brokerUrl == null)
-                    {
-                        throw new ConfigurationException(String.Format("Could not load value for appSettingsKey \"{0}\".", key));
-                    }
+                    throw new ConfigurationErrorsException(String.Format("The {0} app setting is missing", key));
                 }
-                
-                
                 return _brokerUrl;
             }
         }
 
         /// <summary>
-        /// 
         /// </summary>
         public TimeSpan TimeToLive
         {
@@ -49,22 +37,9 @@ namespace SignalR.ActiveMQ
             }
         }
 
-        public int TopicCount
-        {
-            get
-            {
-                return 1;
-            }
-        }
-
         public string TopicPrefix
         {
-            get
-            {
-                return "signalr";
-            }
+            get { return "SignalR."; }
         }
-
-
     }
 }

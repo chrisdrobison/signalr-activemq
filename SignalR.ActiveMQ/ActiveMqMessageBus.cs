@@ -1,94 +1,61 @@
 ﻿using System;
-using System.CodeDom;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS;
+using Apache.NMS.ActiveMQ;
 using Microsoft.AspNet.SignalR;
 using Microsoft.AspNet.SignalR.Messaging;
-using Microsoft.AspNet.SignalR.Tracing;
+using IConnection = Apache.NMS.IConnection;
 
 namespace SignalR.ActiveMQ
 {
-    internal class ActiveMqMessageBus : ScaleoutMessageBus
+    internal class ActiveMqMessageBus : IMessageBus
     {
-        private const string SignalRTopicPrefix = "SIGNALR_TOPIC";
+        private const string TopicName = "AmqMessageBus";
 
-        private readonly ActiveMqConnection _connection;
-        private readonly string[] _topics;
-        private readonly TraceSource _trace;
-        private ActiveMqConnectionContext _connectionContext;
+        private readonly ActiveMqConnectionConfiguration _configuration;
+        private readonly MessageBus _bus;
+
+        private readonly IConnectionFactory _connectionFactory;
+        private IConnection _connection;
+        private ISession _session;
+        private IMessageProducer _producer;
+        private IMessageConsumer _consumer;
 
         public ActiveMqMessageBus(IDependencyResolver resolver, ActiveMqConnectionConfiguration configuration)
-            : base(resolver, configuration)
         {
-            if (configuration == null)
-            {
-                throw new ArgumentException("configuration");
-            }
+            _configuration = configuration;
+            _connectionFactory = new ConnectionFactory(configuration.ConnectionString);
+            _bus = new MessageBus(resolver);
 
-            var traceManager = resolver.Resolve<ITraceManager>();
-            _trace = traceManager["SignalR." + typeof (ActiveMqMessageBus).Name];
-            _connection = new ActiveMqConnection(configuration, _trace);
-            _topics = Enumerable.Range(0, configuration.TopicCount)
-                .Select(topicIndex => SignalRTopicPrefix + "_" + configuration.TopicPrefix + "_" + topicIndex)
-                .ToArray();
-
-            ThreadPool.QueueUserWorkItem(Subscribe);
+            EnsureConnection();
         }
 
-        protected override int StreamCount
+        public Task Publish(Message message)
         {
-            get { return _topics.Length; }
+            _producer.Send(ActiveMqMessage.ToMessage(message, _configuration));
+            return TaskAsyncHelper.Empty;
         }
 
-        protected override void Dispose(bool disposing)
+        public IDisposable Subscribe(ISubscriber subscriber, string cursor, Func<MessageResult, object, Task<bool>> callback, int maxMessages, object state)
         {
-            base.Dispose(disposing);
-            if (disposing)
-            {
-                if (_connectionContext != null)
-                    _connectionContext.Dispose();
-                if (_connection != null)
-                    _connection.Dispose();
-            }
+            return _bus.Subscribe(subscriber, cursor, callback, maxMessages, state);
         }
 
-        protected override Task Send(int streamIndex, IList<Message> messages)
+        private void EnsureConnection()
         {
-            return Task.Run(() =>
-            {
-                byte[] message = ActiveMqMessage.ToMessage(messages);
-                TraceMessages(messages, "Sending");
-                _connectionContext.Publish(streamIndex, message);
-            });
+            _connection = _connectionFactory.CreateConnection();
+            _session = _connection.CreateSession();
+            var topic = _session.GetTopic(String.Format("{0}{1}", _configuration.TopicPrefix, TopicName));
+            _producer =
+                _session.CreateProducer(topic);
+            _consumer = _session.CreateConsumer(topic);
+            _consumer.Listener += OnMessageReceived;
+            _connection.Start();
         }
 
-        private void Subscribe(object state)
+        private void OnMessageReceived(IMessage message)
         {
-            _connectionContext = _connection.Subscribe(_topics, OnMessage, OnError, Open);
-        }
-
-        private void OnMessage(int topicIndex, byte[] message)
-        {
-            var scaleoutMessage = ActiveMqMessage.FromMessage(message);
-            TraceMessages(scaleoutMessage.Messages, "Receiving");
-            OnReceived(topicIndex, 0, scaleoutMessage);
-        }
-
-        private void TraceMessages(IList<Message> messages, string messageType)
-        {
-            if (!_trace.Switch.ShouldTrace(TraceEventType.Verbose))
-            {
-                return;
-            }
-
-            foreach (Message message in messages)
-            {
-                _trace.TraceVerbose("{0} {1} bytes over Service Bus: {2}", messageType, message.Value.Array.Length, message.GetString());
-            }
+            _bus.Publish(ActiveMqMessage.FromMessage(message));
         }
     }
 }
