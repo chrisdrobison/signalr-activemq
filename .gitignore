@@ -4,3 +4,4 @@ SignalR.ActiveMQ/bin/
 SignalR.ActiveMQ/obj/
 packages/
 *.suo
+.vs/

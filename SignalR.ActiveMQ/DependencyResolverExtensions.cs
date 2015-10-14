@@ -6,9 +6,9 @@ namespace SignalR.ActiveMQ
 {
     public static class DependencyResolverExtensions
     {
-        public static IDependencyResolver UseActiveMQ(this IDependencyResolver resolver)
+        public static IDependencyResolver UseActiveMQ(this IDependencyResolver resolver, ActiveMqConnectionConfiguration configuration = null)
         {
-            var config = new ActiveMqConnectionConfiguration();
+            var config = configuration ?? new ActiveMqConnectionConfiguration();
             
             var bus = new Lazy<ActiveMqMessageBus>(() => new ActiveMqMessageBus(resolver, config));
             resolver.Register(typeof(IMessageBus), () => bus.Value);
